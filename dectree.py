@@ -99,6 +99,11 @@ class DecisionTree(object):
             parent_node):
         """contruct decision tree"""
 
+        # handle special case
+        # all with the same labels
+
+        # single sets
+
         # select best attribute
         selected_attribute = self.select_attribute(training_set, attribute_set)
         print "Selected attribute: " , selected_attribute.get_name()
@@ -166,15 +171,11 @@ class DecisionTree(object):
 
     def divide_descendants(self, training_set, attribute):
         """divide training set"""
-        result = []
         name = attribute.get_name()
         for kind in attribute.get_kinds():
             instances = filter(lambda x:x.get_attribute(name) == kind, training_set)
             if len(instances):
-                result.append(instances)
-        print "Divide result: ", result
-        #return result
-        return []
+                yield instances
 
     def predict(self, instance):
         """predict label based on attribute of instance, using constructed tree
