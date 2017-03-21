@@ -34,3 +34,10 @@ class RatioEntropy(Entropy):
         return self._ratio * super(RatioEntropy, self).entropy()
 
 
+def agg_label(labels):
+    def inner(x):
+        label = x.get_label()
+        labels.setdefault(label, 0)
+        labels[label] = labels[label] + 1
+    return inner
+

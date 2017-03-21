@@ -4,12 +4,14 @@
 # Instance
 # id, atrr1, attr2, ..., label
 
+import operator
 import util
 
 class Attribute(object):
     """Used to descirbe attributes"""
 
     def __init__(self, name, kinds):
+        super(Attribute, self).__init__()
         self._name = name
         self._kinds = kinds
         self._kind_num = len(kinds)
@@ -33,6 +35,7 @@ class Attribute(object):
 class Instance(object):
 
     def __init__(self, attributes, label):
+        super(Instance, self).__init__()
         self._attributes = attributes
         self._label = label
         print "Initial with: ", self._attributes
@@ -58,6 +61,10 @@ class Instance(object):
     def get_label(self):
         return self._label
 
+    def set_label(self, label):
+        self._label = label
+        return self
+
     def __repr__(self):
         result = "Instance: %s %s" % (self._attributes, self._label)
         return result
@@ -68,11 +75,14 @@ class Instance(object):
 class Node(object):
     """used to describe node of a decision tree"""
 
-    def __init__(self, is_root, is_leaf, descendants):
+    def __init__(self, is_root, is_leaf):
+        super(Node, self).__init__()
         self._is_leaf = is_leaf
         self._is_root = is_root
-        self._descenddants = descendants
-        self._attribute_name = None
+        self._descenddants = []
+        self._attribute_name = 'None'
+        self._label = 'None'
+        self._kind = 'None'
 
     def add_descendants(self, descendant):
         self._descenddants.append(descendant)
@@ -91,6 +101,14 @@ class Node(object):
         self._attribute_name = name
         return self
 
+    def set_label(self, label):
+        self._label = label
+        return self
+
+    def set_kind(self, kind):
+        self._kind = kind
+        return self
+
     @staticmethod
     def dfs_traverse(node, path, paths):
         """
@@ -99,12 +117,17 @@ class Node(object):
             path, current path
             paths, total paths
         """
-        path.append(node._attribute_name)
+        # TODO make results more direct
+        # a:b
+        # a means current category
+        # b means kind of its parent category
+
+        path.append(':'.join([node._attribute_name, node._kind]))
         if 0 == len(node.descendants()):
             paths.append("-->".join(path))
         else:
             for descendant in node.descendants():
-                dfs_traverse(descendant, path, paths)
+                Node.dfs_traverse(descendant, path, paths)
         path.pop()
 
     def __repr__(self):
@@ -120,34 +143,36 @@ class Node(object):
     __str__ = __repr__
 
 
-
 class DecisionTree(object):
 
     def __init__(self, training_set, attribute_set):
+        super(DecisionTree, self).__init__()
         self._training_set = training_set
         self._attribute_set = attribute_set
-        self._root = Node(True, False, [])
+        self._root = Node(True, False)
 
     def construct(self):
         """construct"""
         self.construct_helper(self._training_set,
                 self._attribute_set,
-                self._root)
+                self._root,
+                'None')
+        return self
 
     def construct_helper(self,
             training_set,
             attribute_set,
-            parent_node):
+            parent_node,
+            kind):
         """contruct decision tree"""
 
         # handle special case
-        # all with the same labels
-
-        # single sets
+        # 1. empty attribute_set
+        # 2. all instances have same value on the same attributes
 
         # empty attribute set
         if 0 == len(attribute_set):
-            self.construct_with_most_labels(training_set, parent_node)
+            self.construct_with_most_labels(training_set, parent_node, kind)
             return
 
         # select best attribute
@@ -156,28 +181,31 @@ class DecisionTree(object):
         attribute_set.pop(selected_attribute.get_name())
 
         # construct node
-        new_node = Node(False, True, [])
+        new_node = Node(False, True)
         new_node.set_attribute(selected_attribute.get_name())
+        new_node.set_kind(kind)
         parent_node.add_descendants(new_node)
+
+        # all has same value on this property
+        uniq_set = set()
+        name = selected_attribute.get_name()
+        map(lambda x: uniq_set.add(x.get_attribute(name)) or uniq_set, training_set)
+
+        if 1 == len(uniq_set):
+            return
 
         # construct each descendants
         descendants = self.divide_descendants(training_set, selected_attribute)
 
         # loop into each descendants
-        for descendant in descendants:
-            self.construct_helper(descendant, attribute_set, new_node)
+        for kind, descendant in descendants:
+            self.construct_helper(descendant, attribute_set, new_node, kind)
 
     def select_attribute(self, training_set, attribute_set):
         """select attribute"""
         total_size = len(training_set)
         labels = {}
-        def agg_label(labels):
-            def inner(x):
-                label = x.get_label()
-                labels.setdefault(label, 0)
-                labels[label] = labels[label] + 1
-            return inner
-        map(agg_label(labels), training_set)
+        map(util.agg_label(labels), training_set)
         probs = [ v * 1.0 / total_size for v in labels.itervalues() ]
         whole_entropy = util.Entropy(probs).entropy()
         attributes_entropy = {}
@@ -196,7 +224,7 @@ class DecisionTree(object):
                 if (0 == len(my_kind)):
                     continue
                 labels ={}
-                map(agg_label(labels), my_kind)
+                map(util.agg_label(labels), my_kind)
                 probs = [ v * 1.0 / len(my_kind) for v in labels.itervalues() ]
                 entropy = util.RatioEntropy(probs, len(my_kind), total_size).entropy()
                 print "Kind: ", kind, " Kind probs: ", probs
@@ -204,16 +232,8 @@ class DecisionTree(object):
                 attribute_entropy.append(entropy)
             attributes_entropy[name] = whole_entropy - sum(attribute_entropy)
 
-        name = None
-        current_max = None
         print "Entropy details: ", attributes_entropy
-        for key, value in attributes_entropy.iteritems():
-            if name is None:
-                name = key
-                current_max = value
-            if value > current_max:
-                name = key
-                current_max = value
+        name = max(attributes_entropy.iteritems(), key=operator.itemgetter(1))[0]
         return attribute_set[name]
 
     def divide_descendants(self, training_set, attribute):
@@ -222,16 +242,23 @@ class DecisionTree(object):
         for kind in attribute.get_kinds():
             instances = filter(lambda x:x.get_attribute(name) == kind, training_set)
             if len(instances):
-                yield instances
+                yield kind, instances
 
-    def construct_with_most_labels(self, training_set, parent_node):
+    def construct_with_most_labels(self, training_set, parent_node, kind):
         """return label"""
-        pass
+        new_node = Node(False, True)
+        labels = {}
+        map(util.agg_label(labels), training_set)
+        max_label = max(labels.iteritems(), key=operator.itemgetter(1))[0]
+        new_node.set_kind(kind)
+        new_node.set_label(max_label)
+        parent_node.add_descendants(new_node)
 
     def predict(self, instance):
         """predict label based on attribute of instance, using constructed tree
         """
-        return self.predict_helper(instance)
+        print self._root
+        #return self.predict_helper(instance)
 
     def predict_helper(self, instance):
         pass
