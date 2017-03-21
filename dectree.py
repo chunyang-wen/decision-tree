@@ -23,6 +23,12 @@ class Attribute(object):
     def get_kinds(self):
         return self._kinds
 
+    def __repr__(self):
+        result = "Attribute: %s %s" % (self._name, self._kinds)
+        return result
+
+    __str__ = __repr__
+
 
 class Instance(object):
 
@@ -66,9 +72,11 @@ class Node(object):
         self._is_leaf = is_leaf
         self._is_root = is_root
         self._descenddants = descendants
+        self._attribute_name = None
 
     def add_descendants(self, descendant):
         self._descenddants.append(descendant)
+        return self
 
     def is_leaf(self):
         return self._is_leaf
@@ -78,6 +86,39 @@ class Node(object):
 
     def descendants(self):
         return self._descenddants
+
+    def set_attribute(self, name):
+        self._attribute_name = name
+        return self
+
+    @staticmethod
+    def dfs_traverse(node, path, paths):
+        """
+        Args:
+            node, next node to traverse
+            path, current path
+            paths, total paths
+        """
+        path.append(node._attribute_name)
+        if 0 == len(node.descendants()):
+            paths.append("-->".join(path))
+        else:
+            for descendant in node.descendants():
+                dfs_traverse(descendant, path, paths)
+        path.pop()
+
+    def __repr__(self):
+        """use dfs"""
+        path = []
+        paths = []
+        Node.dfs_traverse(self, path, paths)
+        if 0 == len(paths):
+            return "\t".join(path)
+        else:
+            return "\n".join(paths)
+
+    __str__ = __repr__
+
 
 
 class DecisionTree(object):
@@ -104,6 +145,11 @@ class DecisionTree(object):
 
         # single sets
 
+        # empty attribute set
+        if 0 == len(attribute_set):
+            self.construct_with_most_labels(training_set, parent_node)
+            return
+
         # select best attribute
         selected_attribute = self.select_attribute(training_set, attribute_set)
         print "Selected attribute: " , selected_attribute.get_name()
@@ -111,6 +157,7 @@ class DecisionTree(object):
 
         # construct node
         new_node = Node(False, True, [])
+        new_node.set_attribute(selected_attribute.get_name())
         parent_node.add_descendants(new_node)
 
         # construct each descendants
@@ -118,7 +165,7 @@ class DecisionTree(object):
 
         # loop into each descendants
         for descendant in descendants:
-            construct_helper(descendant, attribute_set, attribute_seq, new_node)
+            self.construct_helper(descendant, attribute_set, new_node)
 
     def select_attribute(self, training_set, attribute_set):
         """select attribute"""
@@ -176,6 +223,10 @@ class DecisionTree(object):
             instances = filter(lambda x:x.get_attribute(name) == kind, training_set)
             if len(instances):
                 yield instances
+
+    def construct_with_most_labels(self, training_set, parent_node):
+        """return label"""
+        pass
 
     def predict(self, instance):
         """predict label based on attribute of instance, using constructed tree
