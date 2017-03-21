@@ -27,21 +27,25 @@ def generate_training_set():
     return instances
 
 def generate_node():
+    COLOR_BLUE = 'Blue'
+    COLOR_RED = 'Red'
+    SIZE_BIG = 'Big'
+    SIZE_SMALL = 'Small'
     root = dectree.Node(True, False)
     root.set_attribute('ROOT')
     root.set_kind('KIND')
     node1 = dectree.Node(False, True)
     node1.set_attribute('Color')
-    node1.set_kind('Blue')
+    node1.set_kind(COLOR_BLUE)
     node2 = dectree.Node(False, False)
     node2.set_attribute('Size')
-    node2.set_kind('Small')
+    node2.set_kind(SIZE_SMALL)
     node3 = dectree.Node(False, True)
     node3.set_attribute('Color')
-    node3.set_kind('Red')
-    root.add_descendants(node1)
-    root.add_descendants(node2)
-    node2.add_descendants(node3)
+    node3.set_kind(COLOR_RED)
+    root.add_descendants(COLOR_BLUE, node1)
+    root.add_descendants(SIZE_SMALL, node2)
+    node2.add_descendants(COLOR_RED, node3)
     return root
 
 
@@ -60,6 +64,6 @@ print [ x.get_label() for x in training_set ]
 print nodes
 
 tree = dec.construct()
-tree.predict(None)
+print tree.predict(training_set[0])
 
 

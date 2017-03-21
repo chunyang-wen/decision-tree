@@ -7,7 +7,7 @@
 import operator
 import util
 
-DEBUG=False
+DEBUG=True
 
 class Attribute(object):
     """Used to descirbe attributes"""
@@ -83,13 +83,14 @@ class Node(object):
         super(Node, self).__init__()
         self._is_leaf = is_leaf
         self._is_root = is_root
-        self._descenddants = []
+        self._descenddants = {}
         self._attribute_name = 'None'
         self._label = 'None'
         self._kind = 'None'
 
-    def add_descendants(self, descendant):
-        self._descenddants.append(descendant)
+    def add_descendants(self, kind, descendant):
+        """add to dict"""
+        self._descenddants.update({kind : descendant})
         return self
 
     def is_leaf(self):
@@ -103,6 +104,9 @@ class Node(object):
 
     def get_attribute_name(self):
         return self._attribute_name
+
+    def get_label(self):
+        return self._label
 
     def set_attribute(self, name):
         self._attribute_name = name
@@ -137,7 +141,7 @@ class Node(object):
         if 0 == len(node.descendants()):
             paths.append("-->".join(path))
         else:
-            for descendant in node.descendants():
+            for descendant in node.descendants().itervalues():
                 Node.dfs_traverse(descendant, path, paths)
         path.pop()
 
@@ -156,6 +160,8 @@ class Node(object):
 
 class DecisionTree(object):
 
+    KIND_ROOT = '$ROOTKIND$'
+
     def __init__(self, training_set, attribute_set):
         super(DecisionTree, self).__init__()
         self._training_set = training_set
@@ -167,7 +173,7 @@ class DecisionTree(object):
         self.construct_helper(self._training_set,
                 self._attribute_set,
                 self._root,
-                'None')
+                DecisionTree.KIND_ROOT)
         return self
 
     def construct_helper(self,
@@ -197,7 +203,7 @@ class DecisionTree(object):
         new_node.set_attribute(selected_attribute.get_name())
         new_node.set_kind(kind)
         new_node.set_label(self.max_label(training_set))
-        parent_node.add_descendants(new_node)
+        parent_node.add_descendants(kind, new_node)
 
         # all has same value on this property
         uniq_set = set()
@@ -269,7 +275,7 @@ class DecisionTree(object):
         max_label = self.max_label(training_set)
         new_node.set_label(max_label)
         new_node.set_attribute(parent_node.get_attribute_name())
-        parent_node.add_descendants(new_node)
+        parent_node.add_descendants(kind, new_node)
 
     def max_label(self, training_set):
         labels = {}
@@ -280,8 +286,24 @@ class DecisionTree(object):
     def predict(self, instance):
         """predict label based on attribute of instance, using constructed tree
         """
-        print self._root
-        #return self.predict_helper(instance)
+        assert len(self._root.descendants()) > 0, 'must build tree before predicting'
+        assert instance is not None, 'can\' predict None instance'
+        if DEBUG:
+            print "Predict instance: ", instance
+            print "Decision tree:\n", self._root
+        return self.predict_helper(self._root.descendants()[DecisionTree.KIND_ROOT], instance)
 
-    def predict_helper(self, instance):
-        pass
+    def predict_helper(self, node, instance):
+        """dirty job"""
+        if DEBUG:
+            print "Current node: ", node
+        if node.is_leaf():
+            return node.get_label()
+        name = node.get_attribute_name()
+        kind = instance.get_attribute(name)
+
+        if (node.descendants().has_key(kind)):
+            return self.predict_helper(node.descendants()[kind], instance)
+        else:
+            return node.get_label()
+
